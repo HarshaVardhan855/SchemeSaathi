@@ -1,0 +1,67 @@
+version: '3.8'
+
+services:
+  # Main Streamlit App
+  app:
+    build: .
+    ports:
+      - "8501:8501"
+    environment:
+      - GROQ_API_KEY=${GROQ_API_KEY}
+      - WHATSAPP_ACCESS_TOKEN=${WHATSAPP_ACCESS_TOKEN}
+      - WHATSAPP_PHONE_NUMBER_ID=${WHATSAPP_PHONE_NUMBER_ID}
+      - WHATSAPP_VERIFY_TOKEN=${WHATSAPP_VERIFY_TOKEN}
+      - WHATSAPP_APP_SECRET=${WHATSAPP_APP_SECRET}
+      - TWILIO_ACCOUNT_SID=${TWILIO_ACCOUNT_SID}
+      - TWILIO_AUTH_TOKEN=${TWILIO_AUTH_TOKEN}
+      - TWILIO_WHATSAPP_FROM=${TWILIO_WHATSAPP_FROM}
+      - PLAYWRIGHT_HEADLESS=${PLAYWRIGHT_HEADLESS:-true}
+      - PLAYWRIGHT_TIMEOUT=${PLAYWRIGHT_TIMEOUT:-30000}
+      - EMBEDDING_MODEL=${EMBEDDING_MODEL:-sentence-transformers/all-MiniLM-L6-v2}
+      - CHROMA_PERSIST_DIR=${CHROMA_PERSIST_DIR:-./chroma_db}
+      - WHISPER_MODEL=${WHISPER_MODEL:-base}
+      - WHISPER_LANGUAGE=${WHISPER_LANGUAGE:-auto}
+      - APP_HOST=${APP_HOST:-0.0.0.0}
+      - APP_PORT=${APP_PORT:-8501}
+      - DEBUG=${DEBUG:-true}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+    volumes:
+      - ./schemes:/app/schemes:ro
+      - ./chroma_db:/app/chroma_db
+      - ./data:/app/data
+    restart: unless-stopped
+    depends_on:
+      - playwright
+
+  # Playwright Service (for form automation)
+  playwright:
+    image: mcr.microsoft.com/playwright:v1.43.0-jammy
+    command: sleep infinity
+    volumes:
+      - ./playwright_scripts:/app/scripts
+    restart: unless-stopped
+
+  # ChromaDB (optional, for persistent embeddings)
+  chromadb:
+    image: chromadb/chroma:0.5.0
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./chroma_db:/chroma/chroma
+    restart: unless-stopped
+    environment:
+      - CHROMA_SERVER_HOST=0.0.0.0
+      - CHROMA_SERVER_HTTP_PORT=8000
+
+  # Redis (optional, for session caching)
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+
+volumes:
+  redis_data:
+  chroma_data:
