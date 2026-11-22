@@ -2,67 +2,160 @@
 
 **🎯 Track 1: Civic Pulse, Digital Governance & Public Information**
 
-Helps citizens discover and apply for government welfare schemes through voice conversation in Telugu, Hindi, or English. No app install, no literacy required.
+SchemeSaathi helps Indian citizens discover, check eligibility for, and apply for government welfare schemes through conversational voice in **Telugu**, **Hindi**, or **English**. It eliminates bureaucratic friction by translating spoken voice into structured citizen profiles, evaluating eligibility across 15+ central and state schemes via RAG, generating application PDFs, and enabling one-click auto-fill.
 
-## 🚨 Problem
+---
 
-60% of eligible citizens don't claim welfare schemes (PM-KISAN, Ayushman, pensions, scholarships) because forms are complex, English-only, and require documents they don't know how to get.
+## 💡 Key Features
 
-## 💡 Solution
+1. 🗣️ **Voice Q&A**: Real-time voice interaction with multilingual transcription (Groq Whisper-large-v3) and natural audio generation (gTTS in Telugu, Hindi, English).
+2. 🧠 **Dynamic RAG Eligibility Engine**: Evaluates rule logic for 15 schemes (5 Central, 5 Andhra Pradesh, 5 Telangana) with exact match criteria, age bounds, landholdings, caste, and income ceilings.
+3. 📄 **Application & Checklist PDF Generator**: Generates clean, ready-to-print official scheme application forms and missing document checklists in PDF format.
+4. 📲 **WhatsApp Dispatch**: Sends application documents and eligibility summaries directly to citizen WhatsApp numbers via Twilio.
+5. 🤖 **Portal Automation**: Playwright-powered background form filling for portals like PM-KISAN.
+6. 🚀 **Production Ready for Render**: Fast, lightweight FastAPI server designed for zero-fuss deployment to cloud platforms like Render.
 
-1. 🗣️ **Voice Q&A** in Telugu/Hindi/English → extracts structured profile
-2. 🧠 **RAG over curated scheme rules** (15 schemes: 5 Central + 5 AP + 5 Telangana) → computes eligibility + missing docs
-3. 📝 **Auto-fills application** on government portals (Playwright) or generates filled PDF + checklist
-4. 📱 **Delivers via WhatsApp/IVR** — works on feature phones
+---
 
-## 🏗️ Architecture
+## 🏗️ System Architecture
 
 ```text
-Voice Input → Whisper.cpp (STT) → Groq/Llama (Structured Extraction)
-                    ↓
-            State Detection (AP/TS/Other)
-                    ↓
-            RAG Eligibility Engine (sentence-transformers + Llama)
-                    ↓
-            Piper TTS → Voice Response (same language)
-                    ↓
-            Playwright Form-Fill / PDF Generation
-                    ↓
-            WhatsApp Cloud API / Twilio Sandbox
+Voice / Form Input (Telugu / Hindi / English)
+                     │
+                     ▼
+       Groq Whisper Speech-to-Text
+                     │
+                     ▼
+       State Detection (AP / TS / Other)
+                     │
+                     ▼
+       RAG Eligibility Engine (Groq Llama / Qwen)
+       ├─ Central Schemes (PM-KISAN, Ayushman Bharat, etc.)
+       ├─ Andhra Pradesh (Annadata Sukhibhava, NTR Bharosa, etc.)
+       └─ Telangana (Rythu Bandhu, Rythu Bima, Aasara, etc.)
+                     │
+      ┌──────────────┴──────────────┐
+      ▼                             ▼
+ gTTS Multilingual Audio     ReportLab PDF Generator
+ (Instant Voice Reply)       (Filled Forms & Checklists)
+      │                             │
+      └──────────────┬──────────────┘
+                     ▼
+         WhatsApp & Playwright Dispatch
 ```
 
-## 🚀 Quick Start
+---
 
-### 📋 Prerequisites
+## 🚀 Deploying to Render
 
-- Python 3.10+
-- Docker (optional, for local stack)
-- Groq API key (free tier: https://console.groq.com)
+SchemeSaathi is optimized for instant deployment on [Render](https://render.com).
 
-### 💻 Local Development
+### Option 1: Render Blueprint (Automatic & Recommended)
+This repository includes a `render.yaml` blueprint file:
 
+1. Push this repository to your GitHub account (`https://github.com/HarshaVardhan855/SchemeSaathi`).
+2. Log in to [Render Dashboard](https://dashboard.render.com).
+3. Click **New +** → **Blueprint**.
+4. Connect your GitHub repository (`SchemeSaathi`).
+5. Render will detect `render.yaml` automatically.
+6. Enter your `GROQ_API_KEY` under Environment Variables.
+7. Click **Apply**. Render will build and deploy the web service.
+
+---
+
+### Option 2: Manual Web Service Setup on Render
+
+1. Log in to [Render Dashboard](https://dashboard.render.com) and click **New +** → **Web Service**.
+2. Connect your GitHub repository: `https://github.com/HarshaVardhan855/SchemeSaathi`.
+3. Configure the settings:
+   - **Name**: `schemesaathi`
+   - **Region**: Choose closest to your users (e.g., `Singapore` or `Oregon`)
+   - **Branch**: `main`
+   - **Runtime**: `Python 3`
+   - **Build Command**:
+     ```bash
+     pip install -r requirements.txt
+     ```
+   - **Start Command**:
+     ```bash
+     uvicorn server:app --host 0.0.0.0 --port $PORT
+     ```
+   - **Plan**: `Free`
+
+4. Add **Environment Variables** in Render:
+   | Variable | Value | Description |
+   |---|---|---|
+   | `PYTHON_VERSION` | `3.11.9` | Recommended Python version |
+   | `GROQ_API_KEY` | `gsk_...` | Your Groq API key ([Get one free](https://console.groq.com)) |
+   | `GROQ_MODEL` | `qwen/qwen3.8-27b` | High-speed LLM model |
+   | `SCHEMES_DIR` | `./schemes` | Path to scheme knowledge base |
+   | `TWILIO_ACCOUNT_SID` | *(Optional)* | Twilio WhatsApp Account SID |
+   | `TWILIO_AUTH_TOKEN` | *(Optional)* | Twilio WhatsApp Auth Token |
+   | `TWILIO_WHATSAPP_NUMBER` | *(Optional)* | Twilio WhatsApp sandbox number |
+
+5. Click **Create Web Service**. Once deployed, Render gives you a public URL (e.g. `https://schemesaathi.onrender.com`).
+
+---
+
+## 💻 Local Development Setup
+
+### 1. Prerequisites
+- Python 3.10 or 3.11
+- A free Groq API key from [Groq Console](https://console.groq.com)
+
+### 2. Installation
 ```bash
+git clone https://github.com/HarshaVardhan855/SchemeSaathi.git
 cd SchemeSaathi
-cp .env.example .env
-# Edit .env with your Groq API key
-docker-compose up -d
-# OR
+
+# Create and activate virtual environment
+python -m venv venv
+# On Windows:
+.\venv\Scripts\activate
+# On Linux/macOS:
+source venv/bin/activate
+
+# Install dependencies
 pip install -r requirements.txt
-python -m streamlit run streamlit_app.py
 ```
 
-### 🎙️ Voice Pipeline Test
-
+### 3. Configure Environment Variables
+Copy `.env.example` to `.env` and fill in your Groq API key:
 ```bash
-# Record a test audio file (Telugu/Hindi/English)
-python voice_pipeline.py --input test_audio.wav --lang te
+cp .env.example .env
+```
+Inside `.env`:
+```env
+GROQ_API_KEY=your_actual_groq_api_key_here
+GROQ_MODEL=qwen/qwen3.8-27b
+SCHEMES_DIR=./schemes
 ```
 
-## 📁 Project Structure
+### 4. Run the Web Application
+```bash
+python server.py
+# Or with uvicorn:
+uvicorn server:app --reload --host 0.0.0.0 --port 8000
+```
+Open [http://localhost:8000](http://localhost:8000) in your browser.
+
+---
+
+## 📁 Clean Production Project Structure
 
 ```text
-SchemeSaathi/
-├── schemes/                    # Curated scheme knowledge base (15 markdown files)
+schemesaathi/
+├── render.yaml                 # Render infrastructure blueprint
+├── requirements.txt            # Production dependencies
+├── server.py                   # FastAPI application & REST endpoints
+├── models.py                   # Pydantic schemas (profiles, recommendations)
+├── eligibility_rag.py          # Vector RAG & scheme rules engine
+├── state_detector.py           # Language, district, and state detector
+├── voice_pipeline.py           # Speech-to-text & TTS pipeline
+├── pdf_generator.py            # Application & checklist PDF builder
+├── playwright_fill.py          # Portal automation scripts
+├── whatsapp_sender.py          # Twilio WhatsApp messaging integration
+├── schemes/                    # 15 Curated markdown knowledge base files
 │   ├── central/
 │   │   ├── pm_kisan.md
 │   │   ├── ayushman_bharat.md
@@ -81,74 +174,53 @@ SchemeSaathi/
 │       ├── aasara_pension.md
 │       ├── kalyana_lakshmi.md
 │       └── dalit_empowerment.md
-├── voice_pipeline.py           # Whisper → Groq extraction → Piper TTS
-├── state_detector.py           # Language + state inference
-├── eligibility_rag.py          # Embeddings + LLM reasoning
-├── playwright_fill.py          # PM-KISAN form automation
-├── pdf_generator.py            # Filled PDF + checklist generation
-├── whatsapp_sender.py          # WhatsApp Cloud API / Twilio
-├── streamlit_app.py            # Demo UI
-├── requirements.txt
-├── docker-compose.yml
-├── .env.example
-└── README.md
+├── static/                     # Frontend client
+│   ├── index.html              # Single-page interface
+│   ├── style.css               # Design system & styles
+│   ├── app.js                  # Audio recorder & reactive UI controller
+│   └── generated/              # Output directory for PDFs and audio (.gitkeep)
+├── .env.example                # Sample environment configuration
+├── .gitignore                  # Git ignore rules
+└── README.md                   # Documentation
 ```
 
-## 🌐 Languages Supported
+---
 
-- 🇮🇳 **Telugu (te)** — Andhra Pradesh, Telangana
-- 🇮🇳 **Hindi (hi)** — National, North India
-- 🇬🇧 **English (en)** — Urban, officials, fallback
+## 📚 Schemes Covered (15 Schemes)
 
-## 📚 Schemes Covered (15 Total)
+### 🇮🇳 Central Schemes (All States)
+1. 🌾 **PM-KISAN** — Farmer income support (₹6,000/year in 3 installments)
+2. 🏥 **Ayushman Bharat (PM-JAY)** — Health insurance coverage up to ₹5 Lakh/family
+3. 👴 **NSAP Old Age Pension** — Monthly pension for citizens aged 60+
+4. 👩 **NSAP Widow Pension** — Monthly pension for eligible widows aged 40–79
+5. 🛒 **PM-SVANidhi** — Micro-credit working capital loans for street vendors (₹10,000–₹50,000)
 
-### 🇮🇳 Central (5)
+### 🌅 Andhra Pradesh
+1. 🌾 **Annadata Sukhibhava** — Financial assistance for farmers (₹20,000/year including PM-KISAN)
+2. 🤝 **SHG Loan Waiver & Vaddileni Runalu** — Self-Help Group women loan waiver and interest subsidy
+3. 👩 **Mahila Samriddhi** — Financial support for BC/SC/ST/Minority women
+4. 👴 **NTR Bharosa Pension** — Enhanced social security pension (₹4,000/month)
+5. 🎓 **Talliki Vandanam** — Annual educational financial assistance for mothers (₹15,000/year)
 
-1. 🌾 PM-KISAN — Farmer income support (₹6,000/yr)
-2. 🏥 Ayushman Bharat (PM-JAY) — Health insurance (₹5L)
-3. 👴 NSAP Old Age Pension — Senior citizens (₹200–500/mo)
-4. 👩 NSAP Widow Pension — Widows 40–79 (₹300–500/mo)
-5. 🛒 PM-SVANidhi — Street vendor loans (₹10k–50k)
+### 🌇 Telangana
+1. 🌾 **Rythu Bandhu** — Investment support for agriculture (₹10,000/acre/year)
+2. 🛡️ **Rythu Bima** — Life insurance for farmers (₹5 Lakh coverage)
+3. 👵 **Aasara Pension** — Social security pension for senior citizens, widows, and disabled
+4. 💍 **Kalyana Lakshmi / Shaadi Mubarak** — Financial marriage assistance for brides (₹1,00,116)
+5. 🤝 **Dalit Empowerment Scheme** — Financial grant for Dalit family entrepreneurship
 
-### 🌅 Andhra Pradesh (5)
+---
 
-1. 🌾 **Annadata Sukhibhava** — Farmer support (₹13,500/yr incl. PM-KISAN)
-2. 🤝 **SHG Loan Waiver & Vaddileni Runalu** — Women SHG loan waiver + 4% interest subsidy
-3. 👩 **Mahila Samriddhi** — BC/SC/ST/Minority women 45–60 (₹75k/4yr)
-4. 👴 **NTR Bharosa Pension** — Enhanced pension (₹3,000/mo)
-5. 🎓 **Talliki Vandanam** — Mothers of school children (₹15,000/yr)
+## 🌐 Supported Languages
 
-### 🌇 Telangana (5)
+| Language | Code | Region / Usage |
+|---|---|---|
+| **Telugu** | `te` | Andhra Pradesh & Telangana |
+| **Hindi** | `hi` | National & North India |
+| **English** | `en` | Urban & Official fallback |
 
-1. 🌾 **Rythu Bandhu** — Farmer investment support (₹10k/acre/yr)
-2. 🛡️ **Rythu Bima** — Farmer life insurance (₹5L)
-3. 👵 **Aasara Pension** — Old age/widow/disabled (₹2,016–3,016/mo)
-4. 💍 **Kalyana Lakshmi / Shaadi Mubarak** — Marriage grant (₹1,00,116)
-5. 🤝 **Dalit Empowerment Scheme** — Dalit family grant (₹10L unit cost)
-
-## 🧪 Demo Flow
-
-1. 👤 User selects language (Telugu/Hindi/English)
-2. 🗣️ User speaks: "నా పేరు రమేష్. 2 ఎకర్ భూమి. ఆధార్ ఉంది."
-3. 🔍 System extracts profile and detects state (AP)
-4. 🧠 RAG checks applicable schemes
-5. 🔊 Voice response delivers likely eligible schemes
-6. 🖱️ Click "Auto-fill PM-KISAN" → Playwright fills the form
-7. 📄 Download filled PDF and missing-document checklist
-8. 📲 Send the result to WhatsApp
-
-## 🆓 Free Tier Services
-
-| Service | Free Limit |
-|---------|------------|
-| Groq (Llama-3.1-8B-instant) | 14,400 req/day |
-| Whisper.cpp | Local, unlimited |
-| Piper TTS | Local, unlimited |
-| WhatsApp Cloud API | 1,000 conversations/mo |
-| Twilio WhatsApp Sandbox | Unlimited testing |
-| Streamlit Cloud | Free hosting |
-| Render/Railway | 750 hrs/mo |
+---
 
 ## ⚖️ License
 
-MIT — Built for hackathon demonstration.
+MIT License — Built for civic governance and digital inclusion.

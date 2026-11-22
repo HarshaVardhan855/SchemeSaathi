@@ -396,6 +396,6 @@ def serve_index():
 
 if __name__ == "__main__":
     import uvicorn
-    port = int(os.getenv("APP_PORT", 8000))
-    print(f"🌾 Starting SchemeSaathi Web Server on http://localhost:{port}")
-    uvicorn.run("server:app", host="0.0.0.0", port=port, reload=True)
+    port = int(os.getenv("PORT", os.getenv("APP_PORT", 8000)))
+    print(f"🌾 Starting SchemeSaathi Web Server on port {port}")
+    uvicorn.run("server:app", host="0.0.0.0", port=port, reload=False)

@@ -173,7 +173,11 @@ class EligibilityRAG:
     """RAG engine for scheme eligibility determination."""
 
     def __init__(self):
-        self.embedder = SentenceTransformer(EMBEDDING_MODEL)
+        try:
+            self.embedder = SentenceTransformer(EMBEDDING_MODEL)
+        except Exception as e:
+            print(f"SentenceTransformer embedding note: {e}")
+            self.embedder = None
         self.client = chromadb.PersistentClient(path=CHROMA_PERSIST_DIR)
         self.collection = self._get_or_create_collection()
         self.groq_client = Groq(api_key=GROQ_API_KEY)
@@ -230,13 +234,20 @@ class EligibilityRAG:
                 print(f"Error loading {filepath}: {e}")
 
         if documents:
-            embeddings = self.embedder.encode(documents).tolist()
-            self.collection.add(
-                documents=documents,
-                embeddings=embeddings,
-                metadatas=metadatas,
-                ids=ids,
-            )
+            if self.embedder:
+                embeddings = self.embedder.encode(documents).tolist()
+                self.collection.add(
+                    documents=documents,
+                    embeddings=embeddings,
+                    metadatas=metadatas,
+                    ids=ids,
+                )
+            else:
+                self.collection.add(
+                    documents=documents,
+                    metadatas=metadatas,
+                    ids=ids,
+                )
 
         self._initialized = True
         print(f"Initialized RAG with {len(self.scheme_rules)} schemes")

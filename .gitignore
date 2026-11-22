@@ -41,13 +41,9 @@ chroma_db/
 schemesaathi/
 
 # Generated files & media
-static/generated/
-**/static/generated/
+static/generated/*
+!static/generated/.gitkeep
 *.mp3
 *.wav
 *.pdf
 screenshots/
-
-# Temporary / OS
-.DS_Store
-Thumbs.db
