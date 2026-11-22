@@ -411,27 +411,47 @@ class SchemePDFGenerator:
 # Simple FPDF Version (for environments without reportlab)
 # ===========================================
 class SimplePDFGenerator:
-    """Lightweight PDF generator using fpdf2."""
+    """Lightweight PDF generator using fpdf2 with safe fallback fonts."""
 
     def __init__(self, language: Language = Language.TELUGU):
         self.language = language
         self.pdf = FPDF()
-        self.pdf.add_font('DejaVu', '', 'DejaVuSans.ttf', uni=True)
-        self.pdf.add_font('DejaVu', 'B', 'DejaVuSans-Bold.ttf', uni=True)
+        self.font_family = 'Helvetica'
+        for font_path in ['DejaVuSans.ttf', '/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf']:
+            if os.path.exists(font_path):
+                try:
+                    self.pdf.add_font('DejaVu', '', font_path)
+                    bold_path = font_path.replace('DejaVuSans.ttf', 'DejaVuSans-Bold.ttf')
+                    if os.path.exists(bold_path):
+                        self.pdf.add_font('DejaVu', 'B', bold_path)
+                    self.font_family = 'DejaVu'
+                    break
+                except Exception:
+                    pass
 
     def _t(self, key: str) -> str:
-        return get_label(key, self.language)
+        text = get_label(key, self.language)
+        if self.font_family == 'Helvetica':
+            # Encode/decode to latin-1 safely for standard Helvetica
+            return text.encode('latin-1', 'replace').decode('latin-1')
+        return text
+
+    def _safe_str(self, val: Any) -> str:
+        s = str(val) if val is not None else "—"
+        if self.font_family == 'Helvetica':
+            return s.encode('latin-1', 'replace').decode('latin-1')
+        return s
 
     def generate_simple_form(self, profile: UserProfile, eligibility: SchemeEligibility, output_path: str) -> str:
         self.pdf.add_page()
-        self.pdf.set_font('DejaVu', 'B', 16)
-        self.pdf.cell(0, 10, f"{self._t('application_form')} - {eligibility.scheme_name}", ln=True, align='C')
+        self.pdf.set_font(self.font_family, 'B', 16)
+        self.pdf.cell(0, 10, self._safe_str(f"{self._t('application_form')} - {eligibility.scheme_name}"), ln=True, align='C')
         self.pdf.ln(5)
 
         # Personal details
-        self.pdf.set_font('DejaVu', 'B', 12)
+        self.pdf.set_font(self.font_family, 'B', 12)
         self.pdf.cell(0, 8, self._t('personal_details'), ln=True)
-        self.pdf.set_font('DejaVu', '', 10)
+        self.pdf.set_font(self.font_family, '', 10)
 
         fields = [
             (self._t('farmer_name'), profile.name),
@@ -449,32 +469,32 @@ class SimplePDFGenerator:
         ]
 
         for label, value in fields:
-            self.pdf.set_font('DejaVu', 'B', 10)
-            self.pdf.cell(50, 7, f"{label}:", ln=False)
-            self.pdf.set_font('DejaVu', '', 10)
-            self.pdf.cell(0, 7, str(value) if value else "—", ln=True)
+            self.pdf.set_font(self.font_family, 'B', 10)
+            self.pdf.cell(50, 7, self._safe_str(f"{label}:"), ln=False)
+            self.pdf.set_font(self.font_family, '', 10)
+            self.pdf.cell(0, 7, self._safe_str(value), ln=True)
 
         self.pdf.ln(5)
 
         # Missing documents
         if eligibility.missing_documents:
-            self.pdf.set_font('DejaVu', 'B', 12)
+            self.pdf.set_font(self.font_family, 'B', 12)
             self.pdf.cell(0, 8, self._t('missing_docs'), ln=True)
-            self.pdf.set_font('DejaVu', '', 10)
+            self.pdf.set_font(self.font_family, '', 10)
             for doc in eligibility.missing_documents:
                 self.pdf.cell(10, 7, "", ln=False)
-                self.pdf.cell(0, 7, f"☐ {doc}", ln=True)
+                self.pdf.cell(0, 7, self._safe_str(f"[ ] {doc}"), ln=True)
 
         self.pdf.ln(5)
 
         # Next steps
         if eligibility.next_actions:
-            self.pdf.set_font('DejaVu', 'B', 12)
+            self.pdf.set_font(self.font_family, 'B', 12)
             self.pdf.cell(0, 8, self._t('next_steps'), ln=True)
-            self.pdf.set_font('DejaVu', '', 10)
+            self.pdf.set_font(self.font_family, '', 10)
             for i, action in enumerate(eligibility.next_actions, 1):
                 self.pdf.cell(10, 7, "", ln=False)
-                self.pdf.cell(0, 7, f"{i}. {action}", ln=True)
+                self.pdf.cell(0, 7, self._safe_str(f"{i}. {action}"), ln=True)
 
         self.pdf.output(output_path)
         return output_path

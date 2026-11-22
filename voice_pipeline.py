@@ -59,18 +59,17 @@ class ExtractionResult:
 
 
 # ===========================================
-# Whisper.cpp STT
+# Speech-to-Text (STT) Engine
 # ===========================================
 class WhisperSTT:
-    """Wrapper for whisper.cpp for speech-to-text."""
+    """Speech-to-text using Groq Whisper API (whisper-large-v3) with local CLI fallback."""
 
     def __init__(self, model: str = WHISPER_MODEL):
         self.model = model
         self.binary = self._find_whisper_binary()
 
-    def _find_whisper_binary(self) -> str:
-        """Find whisper.cpp binary or main.py."""
-        # Check common locations
+    def _find_whisper_binary(self) -> Optional[str]:
+        """Find local whisper binary if available on system."""
         candidates = [
             "whisper-cli",
             "whisper",
@@ -84,13 +83,13 @@ class WhisperSTT:
                     return c
             except Exception:
                 pass
-        # Fallback: assume installed via pip whisper-cpp-python
-        return "whisper-cli"
+        return None
 
     def transcribe(self, audio_path: str, language: Optional[str] = None) -> str:
-        """Transcribe audio file to text."""
-        # Try Groq Whisper API first if GROQ_API_KEY is available (fast, highly accurate)
+        """Transcribe audio file to text using Groq Whisper API or local binary."""
+        # Primary: Groq Whisper API (whisper-large-v3: high accuracy for Telugu/Hindi/English)
         groq_key = os.getenv("GROQ_API_KEY")
+        groq_error = None
         if groq_key:
             try:
                 client = Groq(api_key=groq_key)
@@ -105,26 +104,32 @@ class WhisperSTT:
                     return transcription.strip()
                 return getattr(transcription, "text", str(transcription)).strip()
             except Exception as e:
-                print(f"Groq Whisper failed, trying local whisper: {e}")
+                groq_error = e
+                print(f"Groq Whisper transcription notice: {e}")
 
-        try:
-            cmd = [self.binary, "-m", f"models/ggml-{self.model}.bin", "-f", audio_path]
-            if language and language != "auto":
-                cmd.extend(["-l", language])
-            cmd.extend(["-oj", "--no-timestamps"])  # JSON output
-
-            result = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
-            if result.returncode != 0:
-                raise RuntimeError(f"Whisper failed: {result.stderr}")
-
-            # Parse JSON output
+        # Secondary fallback: local whisper binary if installed on system host
+        if self.binary:
             try:
-                output = json.loads(result.stdout)
-                return output.get("text", "").strip()
-            except json.JSONDecodeError:
-                return result.stdout.strip()
-        except Exception as e:
-            raise RuntimeError(f"Audio transcription failed: {e}")
+                cmd = [self.binary, "-m", f"models/ggml-{self.model}.bin", "-f", audio_path]
+                if language and language != "auto":
+                    cmd.extend(["-l", language])
+                cmd.extend(["-oj", "--no-timestamps"])  # JSON output
+
+                result = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
+                if result.returncode == 0:
+                    try:
+                        output = json.loads(result.stdout)
+                        return output.get("text", "").strip()
+                    except json.JSONDecodeError:
+                        return result.stdout.strip()
+                else:
+                    print(f"Local whisper binary returned code {result.returncode}: {result.stderr}")
+            except Exception as e:
+                print(f"Local whisper fallback execution failed: {e}")
+
+        if groq_error:
+            raise RuntimeError(f"Audio transcription failed via Groq Whisper API: {groq_error}")
+        raise RuntimeError("Audio transcription failed: GROQ_API_KEY is not configured and no local whisper binary was found.")
 
     async def transcribe_async(self, audio_path: str, language: Optional[str] = None) -> str:
         loop = asyncio.get_event_loop()

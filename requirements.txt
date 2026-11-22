@@ -13,12 +13,11 @@ pydantic>=2.7.0
 pydantic-settings>=2.3.0
 
 # Speech, Voice & Audio
-whisper-cpp-python>=0.1.0
 piper-tts>=1.2.0
 gTTS>=2.5.0
 pydub>=0.25.1
 
-# AI, LLM & RAG
+# AI, LLM & RAG (Groq Whisper-large-v3, Llama/Qwen reasoning)
 groq>=0.10.0
 sentence-transformers>=3.0.0
 chromadb>=0.5.0
